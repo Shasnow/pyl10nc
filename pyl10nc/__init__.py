@@ -154,7 +154,7 @@ def generate(input_path: str, output_path: str = None) -> str:
         with open(output_py, 'w', encoding='utf-8') as f:
             f.write(code)
         print(f"✅ Code generated successfully! File saved to: {output_py}")
-        # also save json file
+        # also save JSON file
         with open(output_json, 'w', encoding='utf-8') as f:
             json.dump(translation_data, f, ensure_ascii=False, indent=4)
         print(f"✅ JSON file generated successfully! File saved to: {output_json}")

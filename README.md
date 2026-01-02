@@ -8,7 +8,6 @@ A Python library to convert TOML localization files into Python classes for easy
 - Support nested TOML structures
 - Generate property-based access methods
 - Automatic method name sanitization
-- Multi-language support
 
 ## Installation
 
@@ -27,9 +26,9 @@ pyl10nc input.toml -o output.py
 ### Python API
 
 ```python
-from pyl10nc import generate
+import pyl10nc
 
-generate('input.toml', 'output.py')
+pyl10nc.generate('input.toml', 'output.py')
 ```
 
 ## TOML Format Example
