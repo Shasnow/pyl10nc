@@ -5,8 +5,8 @@ import argparse
 
 def main():
     """Command-line entry point."""
-    parser = argparse.ArgumentParser(description='Generate localization code from TOML file.')
-    parser.add_argument('input', type=str, help='Path to the input TOML file.')
+    parser = argparse.ArgumentParser(description='Generate localization code from TOML, JSON, or YAML file.')
+    parser.add_argument('input', type=str, help='Path to the input TOML, JSON, or YAML file.')
     parser.add_argument('--output', '-o', type=str, nargs='?', default=None,
                         help='Path to the output Python file (default: same as input with .py suffix).')
 
