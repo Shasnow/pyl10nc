@@ -2,6 +2,8 @@
 
 一个用于将TOML、JSON和YAML本地化文件转换为Python类的库，以便轻松访问本地化字符串。
 
+中文 | [**English**](README.md)
+
 ## 项目背景
 
 考虑一下Python中传统的国际化方法：

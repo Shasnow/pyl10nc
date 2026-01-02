@@ -2,6 +2,8 @@
 
 A Python library to convert TOML, JSON, and YAML localization files into Python classes for easy access to localized strings.
 
+[**中文文档**](README_zh.md) | English
+
 ## Background
 
 Consider the traditional approach to internationalization in Python:
