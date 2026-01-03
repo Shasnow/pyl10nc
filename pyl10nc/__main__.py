@@ -98,7 +98,33 @@ def escape_doc_string(text) -> str:
     return text.replace('"', '\\"').replace('\n', '\\n')
 
 
-def generate(input_path: str, output_path: str = None) -> str:
+def extract_interpolation_variables(text: str) -> list[str]:
+    """
+    Extract variable names from a string with interpolation placeholders.
+    :param text: String that may contain interpolation placeholders like {name}
+    :return: List of variable names found in the string
+    """
+    if not text or not isinstance(text, str):
+        return []
+    
+    # Find all {variable} patterns
+    pattern = r'\{([^}]+)\}'
+    matches = re.findall(pattern, text)
+    return matches
+
+
+def has_interpolation(text: str) -> bool:
+    """
+    Check if a string contains interpolation placeholders.
+    :param text: String to check
+    :return: True if the string contains interpolation placeholders
+    """
+    if not text or not isinstance(text, str):
+        return False
+    return bool(re.search(r'\{[^}]+\}', text))
+
+
+def generate(input_path: str | Path, output_path: str | None = None) -> str:
     """
     Generate localization Python class code from a TOML, JSON, or YAML file.
     :param input_path: Path to the input TOML, JSON, or YAML file.
@@ -129,17 +155,17 @@ def generate(input_path: str, output_path: str = None) -> str:
             if not YAML_AVAILABLE:
                 raise ImportError("YAML support requires PyYAML. Install with: pip install pyl10nc[yaml]")
             with open(input_path, 'r', encoding='utf-8') as f:
-                raw_data = yaml.safe_load(f)
+                raw_data = yaml.safe_load(f) # type: ignore
     except tomllib.TOMLDecodeError as e:
         raise ValueError(f"Failed to parse TOML file: {e}") from e
     except json.JSONDecodeError as e:
         raise ValueError(f"Failed to parse JSON file: {e}") from e
-    except yaml.YAMLError as e:
+    except yaml.YAMLError as e: # type: ignore
         raise ValueError(f"Failed to parse YAML file: {e}") from e
     except Exception as e:
         raise RuntimeError(f"Error reading input file: {e}") from e
 
-    translation_data = normalize_data(raw_data)
+    translation_data = normalize_data(raw_data) # type: ignore
     if not translation_data:
         raise ValueError("No valid translation data found in input file")
 
@@ -194,14 +220,38 @@ def generate(input_path: str, output_path: str = None) -> str:
             doc = lang_values[0] if lang_values else flat_key
         # escape doc string
         escaped_doc = escape_doc_string(doc)
-        # add property method
-        code_lines.extend([
-            f'    @property',
-            f'    def {method_name}(self) -> str:',
-            f'        """{escaped_doc}"""',
-            f'        return self._get_translation("{flat_key}")',
-            ''
-        ])
+        
+        # Check if any language value has interpolation
+        has_interp = any(has_interpolation(v) for k, v in lang_dict.items() if k != 'doc')
+        
+        if has_interp:
+            # Extract variables from the first language value that has interpolation
+            interp_vars = []
+            for k, v in lang_dict.items():
+                if k != 'doc' and has_interpolation(v):
+                    interp_vars = extract_interpolation_variables(v)
+                    break
+            
+            # Create method with parameters
+            params = ', '.join(interp_vars)
+            # Create keyword arguments for format
+            kwargs = ', '.join([f'{var}={var}' for var in interp_vars])
+            code_lines.extend([
+                f'    def {method_name}(self, {params}) -> str:',
+                f'        """{escaped_doc}"""',
+                f'        template = self._get_translation("{flat_key}")',
+                f'        return template.format({kwargs})',
+                ''
+            ])
+        else:
+            # add property method
+            code_lines.extend([
+                f'    @property',
+                f'    def {method_name}(self) -> str:',
+                f'        """{escaped_doc}"""',
+                f'        return self._get_translation("{flat_key}")',
+                ''
+            ])
 
     # add global instance
     code_lines.extend([
