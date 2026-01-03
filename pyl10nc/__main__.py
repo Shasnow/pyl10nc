@@ -141,8 +141,6 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
         output_py = input_path.with_suffix('.py')
     else:
         output_py = Path(output_path).resolve()
-    output_json = output_py.with_suffix('.json')
-    cwd_output_json = str(output_json.relative_to(os.getcwd())).replace('\\', '/')
 
     try:
         if input_path.suffix.lower() == '.toml':
@@ -169,12 +167,30 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
     if not translation_data:
         raise ValueError("No valid translation data found in input file")
 
+    # Extract all available languages
+    languages = set()
+    for lang_dict in translation_data.values():
+        languages.update(k for k in lang_dict.keys() if k != 'doc')
+    
+    # Create separate data for each language
+    language_data = {lang: {k: v.get(lang, '') for k, v in translation_data.items() if lang in v} for lang in languages}
+
     if input_path.suffix.lower() == '.toml':
         file_type = "TOML"
     elif input_path.suffix.lower() == '.json':
         file_type = "JSON"
     else:
         file_type = "YAML"
+    
+    # Generate JSON file paths for each language
+    language_json_files = {}
+    for lang in languages:
+        lang_json_path = output_py.with_name(f"{output_py.stem}_{lang}.json")
+        language_json_files[lang] = str(lang_json_path.relative_to(os.getcwd())).replace('\\', '/')
+    
+    # Get the default language JSON path for initialization
+    default_lang = "zh-cn" if "zh-cn" in languages else next(iter(languages))
+    
     code_lines = [
         '# -*- coding: utf-8 -*-',
         '################################################################################',
@@ -186,26 +202,63 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
         '################################################################################',
         '',
         'import json',
+        'import os',
         '',
         '',
         'class Localization:',
         '    """Automatically generated localization class."""',
-        '    __normalized_data: dict[str, dict[str, str]] = None',
-        '    lang: str = "zh-cn"',
+        '    __normalized_data: dict[str, str] = None',
+        '    lang: str = "' + default_lang + '"',
+        '    __available_languages = ' + str(list(languages)),
+        '    __data_loaded: bool = False',
         '',
         '    def __init__(self):',
         '        """Initialize localization data."""',
-        f"        with open('{cwd_output_json}', 'r', encoding='utf-8') as f:",
-        '            self.__normalized_data = json.load(f)',
+        '        # Don\'t load data immediately, wait for first access',
+        '        pass',
         '',
-        '    def _get_translation(self, key: str) -> str:',
+        '    def __ensure_data_loaded(self):',
+        '        """Ensure translation data is loaded (lazy loading)."""',
+        '        if not self.__data_loaded:',
+        '            self.__load_language_data()',
+        '            self.__data_loaded = True',
+        '',
+        '    def __load_language_data(self):',
+        '        """Load translation data for the current language."""',
+        '        json_path = self.__get_json_path()',
+        '        if os.path.exists(json_path):',
+        '            with open(json_path, \'r\', encoding=\'utf-8\') as f:',
+        '                self.__normalized_data = json.load(f)',
+        '        else:',
+        '            self.__normalized_data = {}',
+        '',
+        '    def __get_json_path(self) -> str:',
+        '        """Get the JSON file path for the current language."""',
+        '        base_path = os.path.splitext(os.path.abspath(__file__))[0]',
+        '        return f"{base_path}_{self.lang}.json"',
+        '',
+        '    @property',
+        '    def available_languages(self):',
+        '        """Get list of available languages."""',
+        '        return self.__available_languages',
+        '',
+        '    def set_language(self, lang: str):',
+        '        """Set the language and mark data as not loaded."""',
+        '        if lang in self.__available_languages:',
+        '            self.lang = lang',
+        '            self.__data_loaded = False',
+        '        else:',
+        '            raise ValueError(f"Language \'{lang}\' is not available. Available languages: {self.__available_languages}")',
+        '',
+        '    def get_translation(self, key: str) -> str:',
         '        """',
         '        Get the translation value for the specified key.',
+        '        ',
         '        :param key: Flattened translation key (e.g., test.group1.hello)',
         '        :return: Translation value for the target language, or key if not found',
         '        """',
-        '        resource = self.__normalized_data.get(key, {})',
-        '        return resource.get(self.lang, key)',
+        '        self.__ensure_data_loaded()',
+        '        return self.__normalized_data.get(key, key)',
         '',
     ]
 
@@ -220,6 +273,9 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
             doc = lang_values[0] if lang_values else flat_key
         # escape doc string
         escaped_doc = escape_doc_string(doc)
+        # Add source identifier to doc string
+        source_identifier = f"From {flat_key}"
+        full_doc = f"{escaped_doc}  \n        {source_identifier}" if escaped_doc else source_identifier
         
         # Check if any language value has interpolation
         has_interp = any(has_interpolation(v) for k, v in lang_dict.items() if k != 'doc')
@@ -238,8 +294,8 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
             kwargs = ', '.join([f'{var}={var}' for var in interp_vars])
             code_lines.extend([
                 f'    def {method_name}(self, {params}) -> str:',
-                f'        """{escaped_doc}"""',
-                f'        template = self._get_translation("{flat_key}")',
+                f'        """{full_doc}"""',
+                f'        template = self.get_translation("{flat_key}")',
                 f'        return template.format({kwargs})',
                 ''
             ])
@@ -248,8 +304,8 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
             code_lines.extend([
                 f'    @property',
                 f'    def {method_name}(self) -> str:',
-                f'        """{escaped_doc}"""',
-                f'        return self._get_translation("{flat_key}")',
+                f'        """{full_doc}"""',
+                f'        return self.get_translation("{flat_key}")',
                 ''
             ])
 
@@ -264,10 +320,13 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
         with open(output_py, 'w', encoding='utf-8') as f:
             f.write(code)
         print(f"✅ Code generated successfully! File saved to: {output_py}")
-        # also save JSON file
-        with open(output_json, 'w', encoding='utf-8') as f:
-            json.dump(translation_data, f, ensure_ascii=False, indent=4)
-        print(f"✅ JSON file generated successfully! File saved to: {output_json}")
+        
+        # Save JSON files for each language
+        for lang, data in language_data.items():
+            lang_json_path = output_py.with_name(f"{output_py.stem}_{lang}.json")
+            with open(lang_json_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            print(f"✅ JSON file for '{lang}' generated successfully! File saved to: {lang_json_path}")
     except Exception as e:
         raise RuntimeError(f"Failed to write output file: {e}") from e
 
