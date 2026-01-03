@@ -275,7 +275,7 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
         escaped_doc = escape_doc_string(doc)
         # Add source identifier to doc string
         source_identifier = f"From {flat_key}"
-        full_doc = f"{escaped_doc}  \n        {source_identifier}" if escaped_doc else source_identifier
+        full_doc = f"{escaped_doc}\n\n        {source_identifier}" if escaped_doc else source_identifier
         
         # Check if any language value has interpolation
         has_interp = any(has_interpolation(v) for k, v in lang_dict.items() if k != 'doc')
