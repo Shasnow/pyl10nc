@@ -310,8 +310,9 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
             ])
 
     # add global instance
+    instance_name = output_py.name.split(".")[0].capitalize()
     code_lines.extend([
-        'localization = Localization()',
+        f'{instance_name} = Localization()',
         ''
     ])
     code = '\n'.join(code_lines)
