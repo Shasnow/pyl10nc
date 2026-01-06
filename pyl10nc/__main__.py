@@ -110,7 +110,7 @@ def extract_interpolation_variables(text: str) -> list[str]:
     # Find all {variable} patterns
     pattern = r'\{([^}]+)\}'
     matches = re.findall(pattern, text)
-    return matches
+    return list(set(matches))  # return unique variable names
 
 
 def has_interpolation(text: str) -> bool:
@@ -121,7 +121,7 @@ def has_interpolation(text: str) -> bool:
     """
     if not text or not isinstance(text, str):
         return False
-    return bool(re.search(r'\{[^}]+\}', text))
+    return bool(re.search(r'\{[^}]+}', text))
 
 
 def generate(input_path: str | Path, output_path: str | None = None) -> str:
