@@ -170,7 +170,7 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
     # Extract all available languages
     languages = set()
     for lang_dict in translation_data.values():
-        languages.update(k for k in lang_dict.keys() if k != 'doc')
+        languages.update(k.lower() for k in lang_dict.keys() if k != 'doc')
     
     # Create separate data for each language
     language_data = {lang: {k: v.get(lang, '') for k, v in translation_data.items() if lang in v} for lang in languages}
@@ -189,7 +189,7 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
         language_json_files[lang] = str(lang_json_path.relative_to(os.getcwd())).replace('\\', '/')
     
     # Get the default language JSON path for initialization
-    default_lang = "zh-cn" if "zh-cn" in languages else next(iter(languages))
+    default_lang = next(iter(languages))
     
     code_lines = [
         '# -*- coding: utf-8 -*-',
@@ -245,7 +245,7 @@ def generate(input_path: str | Path, output_path: str | None = None) -> str:
         '    def set_language(self, lang: str):',
         '        """Set the language and mark data as not loaded."""',
         '        if lang in self.__available_languages:',
-        '            self.lang = lang',
+        '            self.lang = lang.lower()',
         '            self.__data_loaded = False',
         '        else:',
         '            raise ValueError(f"Language \'{lang}\' is not available. Available languages: {self.__available_languages}")',
