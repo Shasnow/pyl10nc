@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# v1.3.4
+
 import argparse
 import os
 import tomllib
@@ -110,7 +113,15 @@ def extract_interpolation_variables(text: str) -> list[str]:
     # Find all {variable} patterns
     pattern = r'\{([^}]+)\}'
     matches = re.findall(pattern, text)
-    return list(set(matches))  # return unique variable names
+    
+    # Deduplicate while preserving order
+    seen = set()
+    unique_vars = []
+    for match in matches:
+        if match not in seen:
+            seen.add(match)
+            unique_vars.append(match)
+    return unique_vars  # return unique variable names in original order
 
 
 def has_interpolation(text: str) -> bool:
